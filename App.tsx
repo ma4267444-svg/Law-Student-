@@ -8,10 +8,9 @@ import { extractTextFromImage } from './utils/ocr';
 import Visualizer from './components/Visualizer';
 
 // --- Configuration ---
-// IMPORTANT: Use your actual Supabase URL here. 
-// If you don't have it yet, go to Supabase Dashboard -> Settings -> API -> URL
-const SUPABASE_KEY = 'sb_publishable_nCHtLbbQvC80P6OJO0y-zg_ZmStfEav'; 
-const SUPABASE_URL = 'https://YOUR_PROJECT_ID.supabase.co'; // <--- ضع رابط مشروعك هنا
+// Connected to Project: Law Student (zganlzrrxpijvipggiei)
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpnYW5senJyeHBpanZpcGdnaWVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0ODcwNjMsImV4cCI6MjA4MTA2MzA2M30.0hmUg6FgYPI62oR2y9avE0s1eqIX2fDxmdsUB9EzlNk'; 
+const SUPABASE_URL = 'https://zganlzrrxpijvipggiei.supabase.co';
 
 // Initialize Supabase Client
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -72,10 +71,44 @@ export default function App() {
             .order('created_at', { ascending: false });
             
         if (error) throw error;
-        setSources((data as any[]) || []);
-    } catch (err) {
-        console.error("Supabase Error:", err);
-        // Fallback for demo if connection fails
+        
+        // Map Database snake_case to App camelCase
+        const mappedSources: SubjectSource[] = (data || []).map((item: any) => ({
+            id: item.id,
+            subjectId: item.subject_id,
+            title: item.title,
+            content: item.content,
+            type: item.type,
+            createdAt: new Date(item.created_at).getTime()
+        }));
+
+        setSources(mappedSources);
+    } catch (err: any) {
+        console.error("Supabase Fetch Error:", err.message || err);
+        
+        // Check for "Relation does not exist" error (Table missing)
+        if (err.code === '42P01') {
+            const sqlMsg = `
+IMPORTANT: The 'resources' table does not exist in your Supabase project.
+Run this SQL in the Supabase SQL Editor:
+
+create table resources (
+  id uuid default gen_random_uuid() primary key,
+  subject_id text not null,
+  title text not null,
+  content text,
+  type text,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+alter table resources enable row level security;
+create policy "Public Access" on resources for all using (true);
+            `;
+            console.warn(sqlMsg);
+            alert("جدول البيانات غير موجود. يرجى مراجعة الـ Console (F12) للحصول على كود إنشاء الجدول.");
+        }
+
+        // Fallback for demo/offline
         setSources(prev => prev.filter(s => s.subjectId === subjectId)); 
     } finally {
         setProcessingStatus('');
@@ -95,12 +128,23 @@ export default function App() {
           ]).select();
 
           if (error) throw error;
-          if (data) {
-              setSources(prev => [data[0] as unknown as SubjectSource, ...prev]);
+          
+          if (data && data[0]) {
+              // Map response back to app format
+              const newSource: SubjectSource = {
+                  id: data[0].id,
+                  subjectId: data[0].subject_id,
+                  title: data[0].title,
+                  content: data[0].content,
+                  type: data[0].type,
+                  createdAt: new Date(data[0].created_at).getTime()
+              };
+              setSources(prev => [newSource, ...prev]);
           }
-      } catch (err) {
-          console.error("Save Error:", err);
-          alert("حدث خطأ أثناء الحفظ في قاعدة البيانات. تأكد من إعدادات Supabase.");
+      } catch (err: any) {
+          console.error("Supabase Save Error:", err.message || err);
+          alert(`حدث خطأ أثناء الحفظ: ${err.message || "تأكد من إعدادات قاعدة البيانات"}`);
+          
           // Fallback to local state
           const localSource = { ...source, id: Date.now().toString(), createdAt: Date.now() };
           setSources(prev => [localSource, ...prev]);
@@ -112,8 +156,8 @@ export default function App() {
           const { error } = await supabase.from('resources').delete().eq('id', id);
           if (error) throw error;
           setSources(prev => prev.filter(s => s.id !== id));
-      } catch (err) {
-          console.error("Delete Error:", err);
+      } catch (err: any) {
+          console.error("Delete Error:", err.message || err);
           alert("فشل الحذف من قاعدة البيانات");
       }
   };
