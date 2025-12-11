@@ -1,0 +1,7 @@
+{
+  "name": "Copy of Mohami AI - Law Tutor",
+  "description": "A real-time AI tutor for law students using Gemini Live API.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
