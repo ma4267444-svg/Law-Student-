@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Mohami AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
@@ -28,8 +28,8 @@
         }
     </script>
     <style>
-        /* Optimization for IFrame embedding */
-        html, body { height: 100%; width: 100%; margin: 0; padding: 0; overflow: hidden; background-color: #121212; }
+        /* Optimization for IFrame and Mobile */
+        html, body { height: 100%; width: 100%; margin: 0; padding: 0; overflow: hidden; background-color: #121212; touch-action: manipulation; }
         #root { height: 100%; width: 100%; }
         /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 6px; }
@@ -43,6 +43,10 @@
     <script type="text/babel" data-type="module">
         import { GoogleGenAI } from "https://esm.sh/@google/genai@1.33.0";
         import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+        // --- 🔴 هام جداً: ضع مفتاح API هنا ---
+        // استبدل النص بين علامات التنصيص بالمفتاح الخاص بك
+        const GOOGLE_API_KEY = "AIzaSyB13O7v8wibBkeuIS29G1u4PRXIV4Dq8qM"; 
 
         // --- CONFIG ---
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpnYW5senJyeHBpanZpcGdnaWVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0ODcwNjMsImV4cCI6MjA4MTA2MzA2M30.0hmUg6FgYPI62oR2y9avE0s1eqIX2fDxmdsUB9EzlNk'; 
@@ -190,7 +194,8 @@
             const [sources, setSources] = React.useState([]);
             const [isProcessingFile, setIsProcessingFile] = React.useState(false);
             const [processingStatus, setProcessingStatus] = React.useState('');
-            const [apiKey, setApiKey] = React.useState(localStorage.getItem('MOHAMI_API_KEY') || '');
+            // Use Hardcoded Key first, then localStorage
+            const [apiKey, setApiKey] = React.useState(GOOGLE_API_KEY || localStorage.getItem('MOHAMI_API_KEY') || '');
             const [connectionState, setConnectionState] = React.useState('DISCONNECTED');
             const [volume, setVolume] = React.useState(0);
             const [errorMsg, setErrorMsg] = React.useState(null);
@@ -212,7 +217,7 @@
             const imageKbInputRef = React.useRef(null);
 
             React.useEffect(() => {
-                if(apiKey) localStorage.setItem('MOHAMI_API_KEY', apiKey);
+                if(apiKey && !GOOGLE_API_KEY) localStorage.setItem('MOHAMI_API_KEY', apiKey);
             }, [apiKey]);
 
             const fetchSources = async (subjectId) => {
@@ -312,7 +317,7 @@
             }, []);
 
             const connect = async () => {
-                if (!apiKey) { setErrorMsg("أدخل API Key"); return; }
+                if (!apiKey) { setErrorMsg("API Key Missing"); return; }
                 initAudioContexts();
                 setConnectionState('CONNECTING');
                 try {
@@ -370,7 +375,10 @@
                             responseModalities: ['AUDIO'],
                             inputAudioTranscription: {}, outputAudioTranscription: {},
                             speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Fenrir' } } },
-                            systemInstruction: `أنت "محامي"، معلم قانوني لمادة ${selectedSubject?.name}. استخدم هذه المصادر: ${subjectDocs}`
+                            systemInstruction: `أنت "Mohami"، معلم قانوني ذكي باللهجة المصرية. 
+                            المادة: ${selectedSubject?.name}.
+                            استخدم هذه المصادر في الشرح: ${subjectDocs}
+                            `
                         }
                     });
                     sessionRef.current = sessionPromise;
@@ -399,9 +407,13 @@
                                 </button>
                             ))}
                         </div>
-                        <div className="mt-12 w-full max-w-md pb-8">
-                            <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="API Key" className="w-full bg-law-900 border border-law-800 rounded-lg p-3 text-center"/>
-                        </div>
+                        
+                        {/* Only show input if NO key is hardcoded */}
+                        {!GOOGLE_API_KEY && (
+                            <div className="mt-12 w-full max-w-md pb-8">
+                                <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="API Key" className="w-full bg-law-900 border border-law-800 rounded-lg p-3 text-center"/>
+                            </div>
+                        )}
                     </div>
                 );
             }
