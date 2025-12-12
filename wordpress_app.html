@@ -45,7 +45,6 @@
         import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
         // --- 🔴 هام جداً: ضع مفتاح API هنا ---
-        // استبدل النص بين علامات التنصيص بالمفتاح الخاص بك
         const GOOGLE_API_KEY = "AIzaSyB13O7v8wibBkeuIS29G1u4PRXIV4Dq8qM"; 
 
         // --- CONFIG ---
@@ -317,14 +316,36 @@
             }, []);
 
             const connect = async () => {
-                if (!apiKey) { setErrorMsg("API Key Missing"); return; }
+                const keyToUse = apiKey || GOOGLE_API_KEY;
+                if (!keyToUse) { setErrorMsg("API Key Missing"); return; }
+                
                 initAudioContexts();
                 setConnectionState('CONNECTING');
+                setErrorMsg(null);
+
                 try {
-                    const ai = new GoogleGenAI({ apiKey });
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    // 1. Try to get Microphone Stream with specific error handling
+                    let stream;
+                    try {
+                        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    } catch (micError) {
+                        console.error("Mic Error:", micError);
+                        if (micError.name === 'NotAllowedError' || micError.name === 'PermissionDeniedError') {
+                            setErrorMsg("❌ تم رفض إذن الميكروفون. اضغط على القفل 🔒 في شريط العنوان وفعّل الميكروفون.");
+                        } else if (micError.name === 'NotFoundError') {
+                            setErrorMsg("❌ لم يتم العثور على ميكروفون في جهازك.");
+                        } else if (micError.name === 'NotReadableError') {
+                            setErrorMsg("❌ الميكروفون مشغول بتطبيق آخر. أغلق التطبيقات الأخرى وحاول مجدداً.");
+                        } else {
+                            // This catches the 'Overlay' error often disguised as generic errors
+                            setErrorMsg("❌ تعذر الوصول للميكروفون. تأكد من إغلاق أي تطبيقات عائمة (مثل الماسنجر) وحاول مرة أخرى.");
+                        }
+                        setConnectionState('DISCONNECTED');
+                        return;
+                    }
+
                     mediaStreamRef.current = stream;
-                    
+                    const ai = new GoogleGenAI({ apiKey: keyToUse });
                     const subjectDocs = sources.map(s => `[${s.title}]: ${s.content}`).join('\n');
                     
                     const sessionPromise = ai.live.connect({
@@ -385,7 +406,7 @@
                 } catch(e) {
                     console.error(e);
                     setConnectionState('DISCONNECTED');
-                    setErrorMsg("فشل الاتصال");
+                    setErrorMsg("فشل الاتصال: " + e.message);
                 }
             };
 
@@ -476,7 +497,7 @@
                         <button onClick={connectionState === 'CONNECTED' ? disconnect : connect} className={`mt-4 w-16 h-16 rounded-full flex items-center justify-center border-2 ${connectionState === 'CONNECTED' ? 'border-red-500 bg-red-900/50 animate-pulse' : 'border-white bg-black'}`}>
                             {connectionState === 'CONNECTING' ? '...' : connectionState === 'CONNECTED' ? '■' : '🎤'}
                         </button>
-                        {errorMsg && <p className="text-red-500 mt-2 text-xs">{errorMsg}</p>}
+                        {errorMsg && <p className="text-red-500 mt-2 text-xs text-center">{errorMsg}</p>}
                     </div>
                 </div>
             );
